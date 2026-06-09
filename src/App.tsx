@@ -6,7 +6,7 @@ import CategoryFilter from './components/CategoryFilter';
 import TrendingSection from './components/TrendingSection';
 import VenueList from './components/VenueList';
 import { useGeolocation } from './hooks/useGeolocation';
-import { useVenues, useTrendingVenues } from './hooks/useVenues';
+import { useVenues, useTrendingVenues, WEBHOOK_URL } from './hooks/useVenues';
 import { Category, Venue } from './types';
 
 export default function App() {
@@ -17,16 +17,22 @@ export default function App() {
   const { venues, loading } = useVenues(activeCategory, location);
   const { venues: trending } = useTrendingVenues(location);
 
+  const discovering = !WEBHOOK_URL || !location;
+
   const handleVenueSelect = useCallback((_venue: Venue) => {
   }, []);
 
   return (
     <div className="h-screen flex flex-col bg-stone-50 overflow-hidden">
       {!splashDone && <SplashScreen onComplete={() => setSplashDone(true)} />}
+
       <Header />
+
       <MapView location={location} venues={venues} onVenueSelect={handleVenueSelect} />
+
       <div className="flex-1 overflow-y-auto">
         <TrendingSection venues={trending} />
+
         <div className="border-t border-stone-100 mt-2 pt-1">
           <div className="flex items-center gap-2 px-4 pt-3 pb-0">
             <h2 className="text-base font-bold text-stone-900">
@@ -39,7 +45,7 @@ export default function App() {
             )}
           </div>
           <CategoryFilter active={activeCategory} onChange={setActiveCategory} />
-          <VenueList venues={venues} loading={loading} />
+          <VenueList venues={venues} loading={loading} discovering={discovering} />
         </div>
       </div>
     </div>
