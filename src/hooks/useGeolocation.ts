@@ -16,25 +16,32 @@ export function useGeolocation(): GeolocationState {
 
   useEffect(() => {
     if (!navigator.geolocation) {
+      console.log('Geolocation not supported');
       setState({ location: { lat: 51.5074, lng: -0.1278 }, error: 'Not supported', loading: false });
       return;
     }
 
+    console.log('Starting watchPosition...');
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
+        console.log('watchPosition fired:', pos.coords.latitude, pos.coords.longitude);
         setState({
           location: { lat: pos.coords.latitude, lng: pos.coords.longitude },
           error: null,
           loading: false,
         });
       },
-      () => {
+      (err) => {
+        console.log('watchPosition error:', err.message);
         setState({ location: { lat: 51.5074, lng: -0.1278 }, error: 'Permission denied', loading: false });
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
+    return () => {
+      console.log('Clearing watchPosition...');
+      navigator.geolocation.clearWatch(watchId);
+    };
   }, []);
 
   return state;
