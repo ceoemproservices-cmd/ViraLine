@@ -44,21 +44,16 @@ function createUserIcon(): L.DivIcon {
   });
 }
 
-let _map: L.Map | null = null;
-let _userMarker: L.Marker | null = null;
-let _lastLocation: Location | null = null;
-
-function applyLocationToMap(location: Location) {
-  _lastLocation = location;
-  if (!_map) return;
-  _map.setView([location.lat, location.lng], 14, { animate: false });
-  _map.invalidateSize();
-  _userMarker?.remove();
-  _userMarker = L.marker([location.lat, location.lng], {
+function moveToLocation(map: L.Map, location: Location, userMarkerRef: React.MutableRefObject<L.Marker | null>) {
+  console.log('[MapView] setView called →', location.lat, location.lng);
+  map.setView([location.lat, location.lng], 14, { animate: false });
+  map.invalidateSize();
+  userMarkerRef.current?.remove();
+  userMarkerRef.current = L.marker([location.lat, location.lng], {
     icon: createUserIcon(),
     zIndexOffset: 1000,
   })
-    .addTo(_map)
+    .addTo(map)
     .bindPopup('<strong>You are here</strong>');
 }
 
@@ -70,16 +65,20 @@ interface Props {
 
 export default function MapView({ location, venues, onVenueSelect }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const mapReadyRef = useRef(false);
+  const userMarkerRef = useRef<L.Marker | null>(null);
   const markersRef = useRef<L.Layer[]>([]);
+
+  const locationRef = useRef<Location | null>(location);
+  useEffect(() => {
+    locationRef.current = location;
+  });
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    if (_map) {
-      _map.remove();
-      _map = null;
-      _userMarker = null;
-    }
+    console.log('[MapView] init effect — location at mount time:', locationRef.current);
 
     const map = L.map(containerRef.current, {
       center: [51.5074, -0.1278],
@@ -95,39 +94,41 @@ export default function MapView({ location, venues, onVenueSelect }: Props) {
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     L.control.attribution({ position: 'bottomleft', prefix: '© <a href="https://openstreetmap.org">OpenStreetMap</a>' }).addTo(map);
 
-    _map = map;
+    mapRef.current = map;
+    mapReadyRef.current = true;
+    console.log('[MapView] map created, mapReadyRef = true');
 
-    requestAnimationFrame(() => {
-      map.invalidateSize();
-      if (_lastLocation) {
-        map.setView([_lastLocation.lat, _lastLocation.lng], 14, { animate: false });
-        if (!_userMarker) {
-          _userMarker = L.marker([_lastLocation.lat, _lastLocation.lng], {
-            icon: createUserIcon(),
-            zIndexOffset: 1000,
-          })
-            .addTo(map)
-            .bindPopup('<strong>You are here</strong>');
-        }
-      }
-    });
+    if (locationRef.current) {
+      console.log('[MapView] init: applying location immediately:', locationRef.current);
+      moveToLocation(map, locationRef.current, userMarkerRef);
+    } else {
+      console.log('[MapView] init: no location yet, will apply via location effect');
+    }
+
+    const t = setTimeout(() => map.invalidateSize(), 150);
 
     return () => {
+      clearTimeout(t);
       map.remove();
-      if (_map === map) {
-        _map = null;
-        _userMarker = null;
-      }
+      mapRef.current = null;
+      mapReadyRef.current = false;
+      userMarkerRef.current = null;
+      console.log('[MapView] cleanup — map removed');
     };
   }, []);
 
   useEffect(() => {
+    console.log('[MapView] location effect →', location, '| mapReady:', mapReadyRef.current, '| map:', !!mapRef.current);
     if (!location) return;
-    applyLocationToMap(location);
+    if (!mapReadyRef.current || !mapRef.current) {
+      console.log('[MapView] location effect: map not ready, init effect will handle it');
+      return;
+    }
+    moveToLocation(mapRef.current, location, userMarkerRef);
   }, [location]);
 
   useEffect(() => {
-    if (!_map) return;
+    if (!mapRef.current) return;
 
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
@@ -136,7 +137,7 @@ export default function MapView({ location, venues, onVenueSelect }: Props) {
       const marker = L.marker([venue.lat, venue.lng], {
         icon: createVenueIcon(venue.category, venue.isOpen),
       })
-        .addTo(_map!)
+        .addTo(mapRef.current!)
         .bindPopup(
           `<div style="min-width:160px">
             <strong style="font-size:14px">${venue.name}</strong>
