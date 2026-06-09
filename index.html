@@ -9,6 +9,18 @@
     <meta property="og:title" content="ViraLine - Discover What's Trending Near You" />
     <meta property="og:description" content="Find the best spots near you, trending right now." />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
