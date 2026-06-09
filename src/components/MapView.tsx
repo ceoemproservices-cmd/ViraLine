@@ -1,116 +1,137 @@
-import { useRef, useEffect } from 'react';
-import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
-import type { Venue } from '../data/types';
-
-interface LatLng { lat: number; lng: number }
-
-interface MapViewProps {
-  venues: Venue[];
-  center?: LatLng;
-  onVenueClick?: (venue: Venue) => void;
-}
+import { useEffect, useRef } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { Location, Venue } from '../types';
 
 const CATEGORY_COLORS: Record<string, string> = {
-  restaurants: '#d4832f',
-  nightlife: '#526085',
-  bars: '#ff5733',
-  cafes: '#a39885',
-  attractions: '#6c371d',
+  restaurants: '#f97316',
+  nightlife: '#a855f7',
+  bars: '#3b82f6',
+  cafes: '#92400e',
+  attractions: '#10b981',
+  worship: '#6366f1',
 };
 
-const mapContainerStyle = { width: '100%', height: '100%' };
-const DEFAULT_CENTER: LatLng = { lat: 40.758, lng: -73.9855 };
-
-const MAP_STYLES = [
-  { elementType: 'geometry', stylers: [{ color: '#f5f1e8' }] },
-  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#6c371d' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#f5f1e8' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#d4e8f0' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#e0ddd5' }] },
-];
-
-export default function MapView({ venues, center, onVenueClick }: MapViewProps) {
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-  const mapRef = useRef<google.maps.Map | null>(null);
-
-  // Pan without remounting when center changes
-  useEffect(() => {
-    if (mapRef.current && center) {
-      mapRef.current.panTo(center);
-    }
-  }, [center]);
-
-  if (!apiKey) {
-    return (
-      <div className="w-full h-[300px] md:h-[400px] bg-gradient-to-br from-warm-100 to-sand-200 rounded-2xl flex items-center justify-center border border-sand-200 overflow-hidden">
-        <div className="text-center p-6">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-warm-200 flex items-center justify-center">
-            <svg className="w-8 h-8 text-warm-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-          </div>
-          <p className="text-sand-700 font-medium text-sm">Map View</p>
-          <p className="text-sand-500 text-xs mt-1">{venues.length} venues in the area</p>
-          <div className="mt-4 grid grid-cols-3 gap-2 max-w-xs mx-auto">
-            {venues.slice(0, 6).map((v) => (
-              <button
-                key={v.id}
-                onClick={() => onVenueClick?.(v)}
-                className="p-2 rounded-lg bg-white/80 border border-sand-200 text-xs text-sand-700 hover:bg-warm-50 transition-colors truncate"
-              >
-                {v.name}
-              </button>
-            ))}
-          </div>
-        </div>
+function createVenueIcon(category: string, isOpen: boolean): L.DivIcon {
+  const color = CATEGORY_COLORS[category] ?? '#f97316';
+  const opacity = isOpen ? '1' : '0.5';
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="
+        width:34px;height:40px;position:relative;
+        filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));
+        opacity:${opacity};
+      ">
+        <svg viewBox="0 0 34 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M17 0C7.6 0 0 7.6 0 17c0 11.9 17 23 17 23S34 28.9 34 17C34 7.6 26.4 0 17 0z" fill="${color}"/>
+          <circle cx="17" cy="17" r="7" fill="white"/>
+        </svg>
       </div>
-    );
-  }
+    `,
+    iconSize: [34, 40],
+    iconAnchor: [17, 40],
+    popupAnchor: [0, -42],
+  });
+}
+
+function createUserIcon(): L.DivIcon {
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="width:20px;height:20px;position:relative;">
+        <div style="
+          width:20px;height:20px;border-radius:50%;
+          background:#3b82f6;
+          border:3px solid white;
+          box-shadow:0 0 0 3px rgba(59,130,246,0.35),0 2px 8px rgba(0,0,0,0.3);
+        "></div>
+      </div>
+    `,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  });
+}
+
+interface Props {
+  location: Location | null;
+  venues: Venue[];
+  onVenueSelect?: (venue: Venue) => void;
+}
+
+export default function MapView({ location, venues, onVenueSelect }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<L.Layer[]>([]);
+  const userMarkerRef = useRef<L.Marker | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+
+    const map = L.map(containerRef.current, {
+      center: [location?.lat ?? 51.5074, location?.lng ?? -0.1278],
+      zoom: 14,
+      zoomControl: false,
+      attributionControl: false,
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+    }).addTo(map);
+
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    L.control
+      .attribution({ position: 'bottomleft', prefix: '© <a href="https://openstreetmap.org">OpenStreetMap</a>' })
+      .addTo(map);
+
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!mapRef.current || !location) return;
+    mapRef.current.setView([location.lat, location.lng], 14, { animate: true });
+
+    userMarkerRef.current?.remove();
+    userMarkerRef.current = L.marker([location.lat, location.lng], { icon: createUserIcon(), zIndexOffset: 1000 })
+      .addTo(mapRef.current)
+      .bindPopup('<strong>You are here</strong>');
+  }, [location]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+
+    venues.forEach((venue) => {
+      const marker = L.marker([venue.lat, venue.lng], { icon: createVenueIcon(venue.category, venue.isOpen) })
+        .addTo(mapRef.current!)
+        .bindPopup(
+          `<div style="min-width:160px">
+            <strong style="font-size:14px">${venue.name}</strong>
+            <div style="font-size:12px;color:#78716c;margin-top:2px">${venue.address}</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+              <span style="font-weight:600">⭐ ${venue.rating.toFixed(1)}</span>
+              <span style="color:${venue.isOpen ? '#10b981' : '#ef4444'};font-weight:600">${venue.isOpen ? 'Open' : 'Closed'}</span>
+            </div>
+          </div>`
+        );
+
+      marker.on('click', () => onVenueSelect?.(venue));
+      markersRef.current.push(marker);
+    });
+  }, [venues, onVenueSelect]);
 
   return (
-    <div className="w-full h-[300px] md:h-[400px] rounded-2xl overflow-hidden border border-sand-200 shadow-sm">
-      <LoadScript
-        googleMapsApiKey={apiKey}
-        loadingElement={
-          <div className="w-full h-full bg-sand-100 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-10 h-10 mx-auto border-3 border-warm-400 border-t-transparent rounded-full animate-spin" />
-              <p className="mt-3 text-sm text-sand-500">Loading map...</p>
-            </div>
-          </div>
-        }
-      >
-        <GoogleMap
-          mapContainerStyle={mapContainerStyle}
-          center={center ?? DEFAULT_CENTER}
-          zoom={14}
-          options={{
-            gestureHandling: 'greedy',
-            disableDefaultUI: true,
-            styles: MAP_STYLES,
-          }}
-          onLoad={(map) => { mapRef.current = map; }}
-        >
-          {venues.map((venue) => (
-            <Marker
-              key={venue.id}
-              position={{ lat: venue.lat, lng: venue.lng }}
-              onClick={() => onVenueClick?.(venue)}
-              icon={{
-                path: 0,
-                fillColor: CATEGORY_COLORS[venue.category] || '#d4832f',
-                fillOpacity: 1,
-                strokeColor: '#ffffff',
-                strokeWeight: 2,
-                scale: 8,
-              }}
-            />
-          ))}
-        </GoogleMap>
-      </LoadScript>
+    <div className="relative flex-shrink-0 border-b border-stone-200" style={{ height: '260px' }}>
+      <div ref={containerRef} className="w-full h-full" />
+      <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-stone-50/60 to-transparent pointer-events-none" />
     </div>
   );
 }
