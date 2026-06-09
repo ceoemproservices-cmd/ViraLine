@@ -20,12 +20,9 @@ export default function App() {
   const handleVenueSelect = useCallback((_venue: Venue) => {
   }, []);
 
-  if (!splashDone) {
-    return <SplashScreen onComplete={() => setSplashDone(true)} />;
-  }
-
   return (
     <div className="h-screen flex flex-col bg-stone-50 overflow-hidden">
+      {!splashDone && <SplashScreen onComplete={() => setSplashDone(true)} />}
       <Header />
       <MapView location={location} venues={venues} onVenueSelect={handleVenueSelect} />
       <div className="flex-1 overflow-y-auto">
