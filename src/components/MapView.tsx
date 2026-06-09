@@ -60,7 +60,7 @@ export default function MapView({ location, venues, onVenueSelect }: Props) {
 
     const center: L.LatLngExpression = location
       ? [location.lat, location.lng]
-      : [51.5074, -0.1278];
+      : [10.63, -61.44];
 
     if (
       seededLocationRef.current &&
