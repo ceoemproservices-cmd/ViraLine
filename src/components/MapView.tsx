@@ -18,11 +18,7 @@ function createVenueIcon(category: string, isOpen: boolean): L.DivIcon {
   return L.divIcon({
     className: '',
     html: `
-      <div style="
-        width:34px;height:40px;position:relative;
-        filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));
-        opacity:${opacity};
-      ">
+      <div style="width:34px;height:40px;position:relative;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));opacity:${opacity};">
         <svg viewBox="0 0 34 40" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M17 0C7.6 0 0 7.6 0 17c0 11.9 17 23 17 23S34 28.9 34 17C34 7.6 26.4 0 17 0z" fill="${color}"/>
           <circle cx="17" cy="17" r="7" fill="white"/>
@@ -40,17 +36,24 @@ function createUserIcon(): L.DivIcon {
     className: '',
     html: `
       <div style="width:20px;height:20px;position:relative;">
-        <div style="
-          width:20px;height:20px;border-radius:50%;
-          background:#3b82f6;
-          border:3px solid white;
-          box-shadow:0 0 0 3px rgba(59,130,246,0.35),0 2px 8px rgba(0,0,0,0.3);
-        "></div>
+        <div style="width:20px;height:20px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 0 0 3px rgba(59,130,246,0.35),0 2px 8px rgba(0,0,0,0.3);"></div>
       </div>
     `,
     iconSize: [20, 20],
     iconAnchor: [10, 10],
   });
+}
+
+function applyLocation(map: L.Map, location: Location, userMarkerRef: React.MutableRefObject<L.Marker | null>) {
+  map.setView([location.lat, location.lng], 14, { animate: true });
+  map.invalidateSize();
+  userMarkerRef.current?.remove();
+  userMarkerRef.current = L.marker([location.lat, location.lng], {
+    icon: createUserIcon(),
+    zIndexOffset: 1000,
+  })
+    .addTo(map)
+    .bindPopup('<strong>You are here</strong>');
 }
 
 interface Props {
@@ -64,12 +67,13 @@ export default function MapView({ location, venues, onVenueSelect }: Props) {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Layer[]>([]);
   const userMarkerRef = useRef<L.Marker | null>(null);
+  const pendingLocationRef = useRef<Location | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
     const map = L.map(containerRef.current, {
-      center: [location?.lat ?? 51.5074, location?.lng ?? -0.1278],
+      center: [51.5074, -0.1278],
       zoom: 14,
       zoomControl: false,
       attributionControl: false,
@@ -80,58 +84,32 @@ export default function MapView({ location, venues, onVenueSelect }: Props) {
     }).addTo(map);
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-    L.control
-      .attribution({ position: 'bottomleft', prefix: '© <a href="https://openstreetmap.org">OpenStreetMap</a>' })
-      .addTo(map);
+    L.control.attribution({ position: 'bottomleft', prefix: '© <a href="https://openstreetmap.org">OpenStreetMap</a>' }).addTo(map);
 
     mapRef.current = map;
 
+    if (pendingLocationRef.current) {
+      applyLocation(map, pendingLocationRef.current, userMarkerRef);
+      pendingLocationRef.current = null;
+    }
+
+    const sizeTimer = setTimeout(() => map.invalidateSize(), 150);
+
     return () => {
+      clearTimeout(sizeTimer);
       map.remove();
       mapRef.current = null;
     };
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current || !location) return;
-    mapRef.current.setView([location.lat, location.lng], 14, { animate: true });
-
-    userMarkerRef.current?.remove();
-    userMarkerRef.current = L.marker([location.lat, location.lng], { icon: createUserIcon(), zIndexOffset: 1000 })
-      .addTo(mapRef.current)
-      .bindPopup('<strong>You are here</strong>');
+    if (!location) return;
+    if (!mapRef.current) {
+      pendingLocationRef.current = location;
+      return;
+    }
+    applyLocation(mapRef.current, location, userMarkerRef);
   }, [location]);
 
   useEffect(() => {
     if (!mapRef.current) return;
-
-    markersRef.current.forEach((m) => m.remove());
-    markersRef.current = [];
-
-    venues.forEach((venue) => {
-      const marker = L.marker([venue.lat, venue.lng], { icon: createVenueIcon(venue.category, venue.isOpen) })
-        .addTo(mapRef.current!)
-        .bindPopup(
-          `<div style="min-width:160px">
-            <strong style="font-size:14px">${venue.name}</strong>
-            <div style="font-size:12px;color:#78716c;margin-top:2px">${venue.address}</div>
-            <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
-              <span style="font-weight:600">⭐ ${venue.rating.toFixed(1)}</span>
-              <span style="color:${venue.isOpen ? '#10b981' : '#ef4444'};font-weight:600">${venue.isOpen ? 'Open' : 'Closed'}</span>
-            </div>
-          </div>`
-        );
-
-      marker.on('click', () => onVenueSelect?.(venue));
-      markersRef.current.push(marker);
-    });
-  }, [venues, onVenueSelect]);
-
-  return (
-    <div className="relative flex-shrink-0 border-b border-stone-200" style={{ height: '260px' }}>
-      <div ref={containerRef} className="w-full h-full" />
-      <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-stone-50/60 to-transparent pointer-events-none" />
-    </div>
-  );
-}
