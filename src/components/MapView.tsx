@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { MapPin } from 'lucide-react';
 import { Location, Venue } from '../types';
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -44,19 +45,6 @@ function createUserIcon(): L.DivIcon {
   });
 }
 
-function moveToLocation(map: L.Map, location: Location, userMarkerRef: React.MutableRefObject<L.Marker | null>) {
-  console.log('[MapView] setView called →', location.lat, location.lng);
-  map.setView([location.lat, location.lng], 14, { animate: false });
-  map.invalidateSize();
-  userMarkerRef.current?.remove();
-  userMarkerRef.current = L.marker([location.lat, location.lng], {
-    icon: createUserIcon(),
-    zIndexOffset: 1000,
-  })
-    .addTo(map)
-    .bindPopup('<strong>You are here</strong>');
-}
-
 interface Props {
   location: Location | null;
   venues: Venue[];
@@ -66,27 +54,44 @@ interface Props {
 export default function MapView({ location, venues, onVenueSelect }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const mapReadyRef = useRef(false);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const markersRef = useRef<L.Layer[]>([]);
-
-  const locationRef = useRef<Location | null>(location);
-  useEffect(() => {
-    locationRef.current = location;
-  });
+  const seededLocationRef = useRef<Location | null>(null);
+  const [gpsTimedOut, setGpsTimedOut] = useState(false);
 
   useEffect(() => {
+    if (location) return;
+    const t = setTimeout(() => setGpsTimedOut(true), 8000);
+    return () => clearTimeout(t);
+  }, [location]);
+
+  useEffect(() => {
+    if (!location && !gpsTimedOut) return;
     if (!containerRef.current) return;
 
-    const initLoc = locationRef.current;
-    console.log('[MapView] init effect — location at mount time:', initLoc);
-
-    const initCenter: L.LatLngExpression = initLoc
-      ? [initLoc.lat, initLoc.lng]
+    const center: L.LatLngExpression = location
+      ? [location.lat, location.lng]
       : [51.5074, -0.1278];
 
+    if (
+      seededLocationRef.current &&
+      location &&
+      seededLocationRef.current.lat === location.lat &&
+      seededLocationRef.current.lng === location.lng
+    ) {
+      return;
+    }
+
+    if (mapRef.current) {
+      markersRef.current.forEach((m) => m.remove());
+      markersRef.current = [];
+      userMarkerRef.current = null;
+      mapRef.current.remove();
+      mapRef.current = null;
+    }
+
     const map = L.map(containerRef.current, {
-      center: initCenter,
+      center,
       zoom: 14,
       zoomControl: false,
       attributionControl: false,
@@ -99,47 +104,40 @@ export default function MapView({ location, venues, onVenueSelect }: Props) {
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     L.control.attribution({ position: 'bottomleft', prefix: '© <a href="https://openstreetmap.org">OpenStreetMap</a>' }).addTo(map);
 
-    mapRef.current = map;
-    mapReadyRef.current = true;
-    console.log('[MapView] map created, mapReadyRef = true, initCenter:', initCenter);
-
-    if (initLoc) {
-      moveToLocation(map, initLoc, userMarkerRef);
+    if (location) {
+      userMarkerRef.current = L.marker([location.lat, location.lng], {
+        icon: createUserIcon(),
+        zIndexOffset: 1000,
+      })
+        .addTo(map)
+        .bindPopup('<strong>You are here</strong>');
     }
 
-    const t1 = setTimeout(() => {
-      const loc = locationRef.current;
-      console.log('[MapView] 500ms tick — loc:', loc);
-      map.invalidateSize();
-      if (loc) moveToLocation(map, loc, userMarkerRef);
-    }, 500);
-
-    const t2 = setTimeout(() => {
-      const loc = locationRef.current;
-      console.log('[MapView] 2000ms fallback — loc:', loc);
-      map.invalidateSize();
-      if (loc) moveToLocation(map, loc, userMarkerRef);
-    }, 2000);
+    mapRef.current = map;
+    seededLocationRef.current = location;
 
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
+      markersRef.current.forEach((m) => m.remove());
+      markersRef.current = [];
+      userMarkerRef.current = null;
       map.remove();
       mapRef.current = null;
-      mapReadyRef.current = false;
-      userMarkerRef.current = null;
-      console.log('[MapView] cleanup — map removed');
+      seededLocationRef.current = null;
     };
-  }, []);
+  }, [!!location, gpsTimedOut]);
 
   useEffect(() => {
-    console.log('[MapView] location effect →', location, '| mapReady:', mapReadyRef.current, '| map:', !!mapRef.current);
-    if (!location) return;
-    if (!mapReadyRef.current || !mapRef.current) {
-      console.log('[MapView] location effect: map not ready, init effect will handle it');
-      return;
+    if (!location || !mapRef.current) return;
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setLatLng([location.lat, location.lng]);
+    } else {
+      userMarkerRef.current = L.marker([location.lat, location.lng], {
+        icon: createUserIcon(),
+        zIndexOffset: 1000,
+      })
+        .addTo(mapRef.current)
+        .bindPopup('<strong>You are here</strong>');
     }
-    moveToLocation(mapRef.current, location, userMarkerRef);
   }, [location]);
 
   useEffect(() => {
@@ -172,6 +170,21 @@ export default function MapView({ location, venues, onVenueSelect }: Props) {
   return (
     <div className="relative flex-shrink-0 border-b border-stone-200" style={{ height: '260px' }}>
       <div ref={containerRef} className="w-full h-full" />
+
+      {!location && !gpsTimedOut && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-stone-100/90 backdrop-blur-sm gap-2">
+          <div className="w-10 h-10 rounded-full border-2 border-orange-500 border-t-transparent animate-spin" />
+          <span className="text-sm font-medium text-stone-500">Locating you…</span>
+        </div>
+      )}
+
+      {!location && gpsTimedOut && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-stone-100/90 backdrop-blur-sm gap-2 pointer-events-none">
+          <MapPin className="w-6 h-6 text-stone-400" />
+          <span className="text-sm font-medium text-stone-400">Enable location for better results</span>
+        </div>
+      )}
+
       <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-stone-50/60 to-transparent pointer-events-none" />
     </div>
   );
