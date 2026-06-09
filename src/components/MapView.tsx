@@ -78,10 +78,15 @@ export default function MapView({ location, venues, onVenueSelect }: Props) {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    console.log('[MapView] init effect — location at mount time:', locationRef.current);
+    const initLoc = locationRef.current;
+    console.log('[MapView] init effect — location at mount time:', initLoc);
+
+    const initCenter: L.LatLngExpression = initLoc
+      ? [initLoc.lat, initLoc.lng]
+      : [51.5074, -0.1278];
 
     const map = L.map(containerRef.current, {
-      center: [51.5074, -0.1278],
+      center: initCenter,
       zoom: 14,
       zoomControl: false,
       attributionControl: false,
@@ -96,19 +101,29 @@ export default function MapView({ location, venues, onVenueSelect }: Props) {
 
     mapRef.current = map;
     mapReadyRef.current = true;
-    console.log('[MapView] map created, mapReadyRef = true');
+    console.log('[MapView] map created, mapReadyRef = true, initCenter:', initCenter);
 
-    if (locationRef.current) {
-      console.log('[MapView] init: applying location immediately:', locationRef.current);
-      moveToLocation(map, locationRef.current, userMarkerRef);
-    } else {
-      console.log('[MapView] init: no location yet, will apply via location effect');
+    if (initLoc) {
+      moveToLocation(map, initLoc, userMarkerRef);
     }
 
-    const t = setTimeout(() => map.invalidateSize(), 150);
+    const t1 = setTimeout(() => {
+      const loc = locationRef.current;
+      console.log('[MapView] 500ms tick — loc:', loc);
+      map.invalidateSize();
+      if (loc) moveToLocation(map, loc, userMarkerRef);
+    }, 500);
+
+    const t2 = setTimeout(() => {
+      const loc = locationRef.current;
+      console.log('[MapView] 2000ms fallback — loc:', loc);
+      map.invalidateSize();
+      if (loc) moveToLocation(map, loc, userMarkerRef);
+    }, 2000);
 
     return () => {
-      clearTimeout(t);
+      clearTimeout(t1);
+      clearTimeout(t2);
       map.remove();
       mapRef.current = null;
       mapReadyRef.current = false;
