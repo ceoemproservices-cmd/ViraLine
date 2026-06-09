@@ -31,11 +31,7 @@ export default function VenueCard({ venue, compact = false }: Props) {
           loading="lazy"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-        <span
-          className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-semibold ${
-            venue.isOpen ? 'bg-emerald-500 text-white' : 'bg-stone-800/80 text-stone-200'
-          }`}
-        >
+        <span className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-semibold ${venue.isOpen ? 'bg-emerald-500 text-white' : 'bg-stone-800/80 text-stone-200'}`}>
           {venue.isOpen ? 'Open' : 'Closed'}
         </span>
         <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/50 backdrop-blur-sm text-white text-xs font-medium px-2 py-1 rounded-full">
@@ -66,12 +62,7 @@ export default function VenueCard({ venue, compact = false }: Props) {
           )}
         </div>
         {!compact && (
-          
-            href={getDirectionsUrl(venue.lat, venue.lng, venue.name)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white text-sm font-semibold transition-colors duration-150"
-          >
+          <a href={getDirectionsUrl(venue.lat, venue.lng, venue.name)} target="_blank" rel="noopener noreferrer" className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white text-sm font-semibold transition-colors duration-150">
             <Navigation className="w-3.5 h-3.5" />
             Get Directions
           </a>
