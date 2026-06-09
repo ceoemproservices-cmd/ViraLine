@@ -16,22 +16,35 @@ export function useGeolocation(): GeolocationState {
 
   useEffect(() => {
     if (!navigator.geolocation) {
-      setState({ location: { lat: 51.5074, lng: -0.1278 }, error: 'Not supported', loading: false });
+      setState({ 
+        location: { lat: 51.5074, lng: -0.1278 }, 
+        error: 'Not supported', 
+        loading: false 
+      });
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        console.log('GPS Success:', pos.coords.latitude, pos.coords.longitude);
         setState({
-          location: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+          location: { 
+            lat: pos.coords.latitude, 
+            lng: pos.coords.longitude 
+          },
           error: null,
           loading: false,
         });
       },
-      () => {
-        setState({ location: { lat: 51.5074, lng: -0.1278 }, error: 'Permission denied', loading: false });
+      (err) => {
+        console.log('GPS Error:', err.message);
+        setState({ 
+          location: { lat: 51.5074, lng: -0.1278 }, 
+          error: err.message, 
+          loading: false 
+        });
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   }, []);
 
