@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Category, Location, Venue } from '../types';
 
-export const WEBHOOK_URL = 'https://warnereustace.app.n8n.cloud/webhook-test/b8f6b237-76b1-4485-ab02-803753a6a08f';
+export const WEBHOOK_URL = 'https://booted-feminine-staff.ngrok-free.dev/webhook-test/b8f6b237-76b1-4485-ab02-803753a6a08f';
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
