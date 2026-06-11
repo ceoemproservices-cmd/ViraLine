@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Category, Location, Venue } from '../types';
 
-export const WEBHOOK_URL = 'https://booted-feminine-staff.ngrok-free.dev/webhook-test/5aee742d-3090-4d43-bebb-67daf1bc966f';
+export const WEBHOOK_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/venues-proxy`;
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
@@ -25,7 +25,11 @@ async function fetchFromWebhook(
 ): Promise<Omit<Venue, 'distance'>[]> {
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      'Apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+    },
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(`Webhook responded ${res.status}`);
@@ -43,7 +47,6 @@ export function useVenues(category: Category, location: Location | null): VenueS
 
   useEffect(() => {
     setState({ venues: [], loading: true, error: null });
-
     if (!WEBHOOK_URL || !location) return;
 
     let cancelled = false;
@@ -73,7 +76,6 @@ export function useTrendingVenues(location: Location | null): VenueState {
 
   useEffect(() => {
     setState({ venues: [], loading: true, error: null });
-
     if (!WEBHOOK_URL || !location) return;
 
     let cancelled = false;
