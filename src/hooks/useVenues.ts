@@ -21,7 +21,7 @@ interface VenueState {
 
 async function fetchFromWebhook(
   url: string,
-  payload: { lat: number; lng: number; category: Category; localTime: string; timezone: string }
+  payload: { latitude: number; longitude: number; radius: number; category: Category; localTime: string; timezone: string }
 ): Promise<Omit<Venue, 'distance'>[]> {
   const res = await fetch(url, {
     method: 'POST',
@@ -39,7 +39,7 @@ async function fetchFromWebhook(
 function buildPayload(location: Location, category: Category) {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const localTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-  return { lat: location.lat, lng: location.lng, category, localTime, timezone };
+  return { latitude: location.lat, longitude: location.lng, radius: 1500, category, localTime, timezone };
 }
 
 export function useVenues(category: Category, location: Location | null): VenueState {
