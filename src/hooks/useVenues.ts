@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Category, Location, Venue } from '../types';
 
-export const WEBHOOK_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/venues-proxy`;
+export const WEBHOOK_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quick-service`;
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
