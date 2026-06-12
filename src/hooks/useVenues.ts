@@ -16,6 +16,12 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+class WebhookError extends Error {
+  constructor(public status: number, body: string) {
+    super(`Webhook responded ${status}: ${body}`);
+  }
+}
+
 interface VenueState {
   venues: Venue[];
   loading: boolean;
@@ -25,7 +31,7 @@ interface VenueState {
 async function fetchFromWebhook(
   url: string,
   payload: { latitude: number; longitude: number; radius: number; category: Category; localTime: string; timezone: string }
-): Promise<Omit<Venue, 'distance'>[]> {
+): Promise<Venue[]> {
   console.log('[ViraLine] fetch → POST', url, payload);
   const res = await fetch(url, {
     method: 'POST',
@@ -40,11 +46,33 @@ async function fetchFromWebhook(
   if (!res.ok) {
     const text = await res.text();
     console.error('[ViraLine] error body =', text);
-    throw new Error(`Webhook responded ${res.status}`);
+    throw new WebhookError(res.status, text);
   }
   const data = await res.json();
   console.log('[ViraLine] response data =', data);
   return data;
+}
+
+async function fetchWithRetry(
+  url: string,
+  payload: { latitude: number; longitude: number; radius: number; category: Category; localTime: string; timezone: string },
+  maxAttempts = 3,
+  retryDelayMs = 2000
+): Promise<Venue[]> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fetchFromWebhook(url, payload);
+    } catch (err) {
+      const is404 = err instanceof WebhookError && err.status === 404;
+      if (is404 && attempt < maxAttempts) {
+        console.warn(`[ViraLine] 404 on attempt ${attempt}/${maxAttempts}, retrying in ${retryDelayMs}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('fetchWithRetry exhausted');
 }
 
 function buildPayload(location: Location, category: Category) {
@@ -67,7 +95,7 @@ export function useVenues(category: Category, location: Location | null): VenueS
 
     let cancelled = false;
 
-    fetchFromWebhook(WEBHOOK_URL, buildPayload(location, category))
+    fetchWithRetry(WEBHOOK_URL, buildPayload(location, category))
       .then((data) => {
         if (cancelled) return;
         const withDistance = data.map((v) => ({

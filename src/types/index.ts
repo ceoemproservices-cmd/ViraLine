@@ -1,10 +1,4 @@
-export type Category =
-  | 'restaurants'
-  | 'nightlife'
-  | 'bars'
-  | 'cafes'
-  | 'attractions'
-  | 'worship';
+export type Category = 'restaurants' | 'cafes' | 'bars' | 'entertainment' | 'shopping';
 
 export interface Location {
   lat: number;
@@ -14,15 +8,16 @@ export interface Location {
 export interface Venue {
   id: string;
   name: string;
-  category: Category;
-  photo: string;
+  address: string;
   rating: number;
   reviewCount: number;
+  priceLevel: number;
   isOpen: boolean;
-  priceLevel: 0 | 1 | 2 | 3 | 4;
-  distance: number;
+  trending: boolean;
   lat: number;
   lng: number;
-  address: string;
-  trending: boolean;
+  photo?: string;
+  distance: number;
+  category?: Category;
+  waitTime?: number;
 }
