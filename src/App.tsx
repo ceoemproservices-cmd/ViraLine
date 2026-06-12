@@ -14,8 +14,9 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState<Category>('restaurants');
 
   const { location } = useGeolocation();
-  const { venues, loading } = useVenues(activeCategory, location);
-  const { venues: trending } = useTrendingVenues(location);
+  const venueState = useVenues(activeCategory, location);
+  const { venues, loading } = venueState;
+  const { venues: trending } = useTrendingVenues(venueState);
 
   const discovering = !WEBHOOK_URL || !location;
 

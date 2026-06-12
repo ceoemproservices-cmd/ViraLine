@@ -88,40 +88,14 @@ export function useVenues(category: Category, location: Location | null): VenueS
   return state;
 }
 
-export function useTrendingVenues(location: Location | null): VenueState {
-  const [state, setState] = useState<VenueState>({ venues: [], loading: true, error: null });
+export function useTrendingVenues(venueState: VenueState): VenueState {
+  const trending = venueState.venues
+    .filter((v) => v.trending)
+    .slice(0, 5);
 
-  useEffect(() => {
-    console.log('[ViraLine] useTrendingVenues effect — location:', location);
-    setState({ venues: [], loading: true, error: null });
-
-    if (!WEBHOOK_URL || !location) {
-      console.warn('[ViraLine] useTrendingVenues: early exit — WEBHOOK_URL:', WEBHOOK_URL, 'location:', location);
-      return;
-    }
-
-    let cancelled = false;
-
-    fetchFromWebhook(WEBHOOK_URL, buildPayload(location, 'restaurants'))
-      .then((data) => {
-        if (cancelled) return;
-        const trending = data
-          .filter((v) => v.trending)
-          .map((v) => ({
-            ...v,
-            distance: haversineDistance(location.lat, location.lng, v.lat, v.lng),
-          }))
-          .slice(0, 5);
-        setState({ venues: trending, loading: false, error: null });
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        console.error('[ViraLine] useTrendingVenues fetch failed:', err);
-        setState({ venues: [], loading: false, error: err.message });
-      });
-
-    return () => { cancelled = true; };
-  }, [location]);
-
-  return state;
+  return {
+    venues: trending,
+    loading: venueState.loading,
+    error: venueState.error,
+  };
 }
