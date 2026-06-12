@@ -22,21 +22,60 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
 
-    const upstream = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    let upstream: Response;
+    try {
+      upstream = await fetch(webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (fetchErr) {
+      return new Response(
+        JSON.stringify({ error: "Failed to reach N8N_WEBHOOK_URL", detail: fetchErr.message, url: webhookUrl }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
-    const data = await upstream.json();
+    const contentType = upstream.headers.get("content-type") ?? "";
+    const rawText = await upstream.text();
+
+    if (!contentType.includes("application/json")) {
+      return new Response(
+        JSON.stringify({
+          error: "Upstream returned non-JSON response",
+          upstreamStatus: upstream.status,
+          contentType,
+          body: rawText.slice(0, 500),
+        }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    let data: unknown;
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      return new Response(
+        JSON.stringify({
+          error: "Upstream response was not valid JSON",
+          upstreamStatus: upstream.status,
+          body: rawText.slice(0, 500),
+        }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     return new Response(JSON.stringify(data), {
       status: upstream.status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: err.message, stack: err.stack }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
