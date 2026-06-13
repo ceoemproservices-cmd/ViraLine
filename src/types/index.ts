@@ -1,4 +1,10 @@
-export type Category = 'restaurants' | 'cafes' | 'bars' | 'entertainment' | 'shopping';
+export type Category =
+  | 'restaurants'
+  | 'nightlife'
+  | 'bars'
+  | 'cafes'
+  | 'attractions'
+  | 'worship';
 
 export interface Location {
   lat: number;
