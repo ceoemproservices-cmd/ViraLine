@@ -48,8 +48,10 @@ async function fetchFromWebhook(
     console.error('[ViraLine] error body =', text);
     throw new WebhookError(res.status, text);
   }
-  const data = await res.json();
-  console.log('[ViraLine] response data =', data);
+  const raw = await res.json();
+  console.log('[ViraLine] response data =', raw);
+  const data: Venue[] = Array.isArray(raw) ? raw : raw.data ?? raw.venues ?? Object.values(raw);
+  console.log('[ViraLine] parsed array =', data);
   return data;
 }
 
