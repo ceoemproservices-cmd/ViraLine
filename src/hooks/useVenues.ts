@@ -49,6 +49,11 @@ async function fetchFromWebhook(
     throw new WebhookError(res.status, text);
   }
   const raw = await res.json();
+  console.log('n8n raw response:', JSON.stringify(raw).slice(0, 500));
+  console.log('type:', typeof raw, 'isArray:', Array.isArray(raw), 'length:', Array.isArray(raw) ? raw.length : 'N/A');
+  if (Array.isArray(raw) && raw.length > 0) {
+    console.log('first item keys:', Object.keys(raw[0]));
+  }
   console.log('[ViraLine] response data =', raw);
   const data: Venue[] = (() => {
     const items: unknown[] = Array.isArray(raw) ? raw : (raw as any).data ?? (raw as any).venues ?? Object.values(raw as object);
