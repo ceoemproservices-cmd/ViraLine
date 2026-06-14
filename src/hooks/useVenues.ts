@@ -50,7 +50,12 @@ async function fetchFromWebhook(
   }
   const raw = await res.json();
   console.log('[ViraLine] response data =', raw);
-  const data: Venue[] = Array.isArray(raw) ? raw : raw.data ?? raw.venues ?? Object.values(raw);
+  const data: Venue[] = (() => {
+    const items: unknown[] = Array.isArray(raw) ? raw : (raw as any).data ?? (raw as any).venues ?? Object.values(raw as object);
+    const unwrapped = items.map((item: any) => item?.json ?? item);
+    if (unwrapped.length === 1 && Array.isArray(unwrapped[0])) return unwrapped[0] as Venue[];
+    return unwrapped as Venue[];
+  })();
   console.log('[ViraLine] parsed array =', data);
   return data;
 }
